@@ -149,6 +149,8 @@ jobs:
   build-macos:
     runs-on: macos-latest
     needs: build-linux
+    outputs:
+      commit_hash: ${{ steps.build-macos.outputs.commit_hash }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -195,6 +197,8 @@ jobs:
 
           git commit -m "fix(release): added libs for ios/ios simulator"
           git push
+          git rev-parse HEAD
+          echo "commit_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   create-release:
     runs-on: ubuntu-latest
@@ -203,30 +207,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ^1.20
-
-      - name: Checkout branch
+      - name: show
         run: |
-          git pull && git checkout "$BRANCH_NAME" && git pull
-          git submodule update --init --recursive
+         echo "hash" "${{ needs.build-macos.outputs.commit_hash }}"
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        run: gh release create "release-${{ github.event.inputs.version }}" -t "${{ github.event.inputs.version }}" --target "${{ needs.build-linux.outputs.commit_hash }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: ${{ github.event.inputs.version }}
-          # body: |
-          #   Changes in this Release
-          #   - First Change
-          #   - Second Change
-          draft: false
-          prerelease: false
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   delete-branch:
     runs-on: ubuntu-latest
@@ -239,5 +228,5 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git pull && git push origin -d "$BRANCH_NAME"
+          git pull && git push origin -d refs/origin/"$BRANCH_NAME"
 
