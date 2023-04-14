@@ -149,8 +149,6 @@ jobs:
   build-macos:
     runs-on: macos-latest
     needs: build-linux
-    outputs:
-      commit_hash: ${{ steps.build-macos.outputs.commit_hash }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -197,8 +195,6 @@ jobs:
 
           git commit -m "fix(release): added libs for ios/ios simulator"
           git push
-          git rev-parse HEAD
-          echo "commit_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   create-release:
     runs-on: ubuntu-latest
@@ -206,14 +202,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Set hash
+        id: set-hash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        run: |
+          git pull && git checkout "$BRANCH_NAME" && git pull
+          git submodule update --init --recursive
+          git branch -av
+          git rev-parse HEAD
+          echo "hash=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: show
         run: |
-         echo "hash" "${{ needs.build-macos.outputs.commit_hash }}"
+         echo "hash" "${{ env.hash }}"
 
       - name: Create Release
         id: create_release
-        run: gh release create "release-${{ github.event.inputs.version }}" -t "${{ github.event.inputs.version }}" --target "${{ needs.build-linux.outputs.commit_hash }}"
+        run: gh release create "release-${{ github.event.inputs.version }}" -t "${{ github.event.inputs.version }}" --target "${{ env.hash }}"
         env:
           GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
