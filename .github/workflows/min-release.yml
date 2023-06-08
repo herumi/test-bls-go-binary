@@ -44,31 +44,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ^1.20
 
       - name: Build linux
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
         run: |
           git pull && git checkout release
-          git submodule update --init --recursive
 
-          sudo apt update
 
-          [ -d ./bls/lib/linux/ ] && rm -rf ./bls/lib/linux/
-          make clean
-
-          mkdir -p ./bls/lib/linux/
-
-          make CXX=clang++
+          date > time.txt
 
           git config user.name github-actions
           git config user.email github-actions@github.com
 
-          git add ./bls/lib/linux -f
+          git add ./time.txt -f
 
           changes=$(git diff --staged --numstat | wc -l)
           if [[ $changes -gt 0 ]]
