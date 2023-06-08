@@ -1,0 +1,105 @@
+name: Release
+
+
+permissions:
+  contents: write
+  repository-projects: write
+
+concurrency:
+  group: "release-${{ github.ref }}"
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'release/tag: vX.Y.Z'
+        required: true
+
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        run: |
+          git pull
+          git checkout release 2>/dev/null || git checkout -b release
+          git merge origin/master -q -m "chore(git): merged latest master"
+          git submodule update --init --recursive
+
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git push --set-upstream origin release
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: create-branch
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ^1.20
+
+      - name: Build linux
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        run: |
+          git pull && git checkout release
+          git submodule update --init --recursive
+
+          sudo apt update
+
+          [ -d ./bls/lib/linux/ ] && rm -rf ./bls/lib/linux/
+          make clean
+
+          mkdir -p ./bls/lib/linux/
+
+          make CXX=clang++
+
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+          git add ./bls/lib/linux -f
+
+          changes=$(git diff --staged --numstat | wc -l)
+          if [[ $changes -gt 0 ]]
+          then
+            git commit -m "fix(release): added libs for linux(amd64/arm64)"
+            git push
+          fi
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: build-linux
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set hash
+        id: set-hash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        run: |
+          git pull && git checkout release
+          git submodule update --init --recursive
+          git branch -av
+          git rev-parse HEAD
+          echo "hash=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: show
+        run: |
+         echo "hash" "${{ env.hash }}"
+
+      - name: Create Release
+        id: create_release
+        run: gh release create "${{ github.event.inputs.version }}" -t "${{ github.event.inputs.version }}" --target "release" --latest
+        env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
