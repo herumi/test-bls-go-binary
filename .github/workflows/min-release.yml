@@ -62,7 +62,7 @@ jobs:
           changes=$(git diff --staged --numstat | wc -l)
           if [[ $changes -gt 0 ]]
           then
-            git commit -m "fix(release): added libs for linux(amd64/arm64)"
+            git commit -m "fix(release): added time.txt"
             git push
           fi
 
