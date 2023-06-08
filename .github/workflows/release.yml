@@ -75,6 +75,7 @@ jobs:
           git pull && git checkout release
           git submodule update --init --recursive
 
+          sudo apt update
           sudo apt install nasm
 
           [ -d ./bls/lib/linux/ ] && rm -rf ./bls/lib/linux/
